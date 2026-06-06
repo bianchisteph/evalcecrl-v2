@@ -250,6 +250,11 @@ a:hover {
   padding-right: 36px;
 }
 
+.select option {
+  background: #1e1e2e;
+  color: #f1f5f9;
+}
+
 .select-compact {
   padding: var(--space-xs) var(--space-sm);
   padding-right: 28px;
