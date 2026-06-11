@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 1. TABLE : teachers (Enseignants)
 -- ============================================================
 CREATE TABLE teachers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   email TEXT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -91,34 +91,50 @@ CREATE TRIGGER trg_evaluations_updated_at
   EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
--- 6. RLS POLICIES (Préparées — À activer avec Supabase Auth)
+-- 6. TRIGGER : Synchronisation automatique auth.users -> public.teachers
 -- ============================================================
--- Ces policies sont commentées pour le MVP.
--- Pour les activer :
--- 1. Activer RLS sur chaque table
--- 2. Décommenter les policies
--- 3. Configurer Supabase Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.teachers (id, name, email)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'name', 'Enseignant'),
+    NEW.email
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "teachers_own_data" ON teachers
---   FOR ALL USING (id = auth.uid());
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
 
--- ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "classes_own_data" ON classes
---   FOR ALL USING (teacher_id = auth.uid());
+-- ============================================================
+-- 7. RLS POLICIES (Sécurité des données par enseignant)
+-- ============================================================
 
--- ALTER TABLE students ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "students_own_data" ON students
---   FOR ALL USING (
---     class_id IN (SELECT id FROM classes WHERE teacher_id = auth.uid())
---   );
+ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "teachers_own_data" ON teachers
+  FOR ALL USING (id = auth.uid());
 
--- ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "evaluations_own_data" ON evaluations
---   FOR ALL USING (
---     student_id IN (
---       SELECT s.id FROM students s
---       JOIN classes c ON s.class_id = c.id
---       WHERE c.teacher_id = auth.uid()
---     )
---   );
+ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "classes_own_data" ON classes
+  FOR ALL USING (teacher_id = auth.uid());
+
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "students_own_data" ON students
+  FOR ALL USING (
+    class_id IN (SELECT id FROM classes WHERE teacher_id = auth.uid())
+  );
+
+ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "evaluations_own_data" ON evaluations
+  FOR ALL USING (
+    student_id IN (
+      SELECT s.id FROM students s
+      JOIN classes c ON s.class_id = c.id
+      WHERE c.teacher_id = auth.uid()
+    )
+  );

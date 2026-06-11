@@ -12,7 +12,7 @@ Application web de suivi des compétences CECRL pour les enseignants d'anglais e
 - **Grille d'évaluation CECRL** : Saisie de masse des niveaux (A1→C2) pour 5 compétences langagières
 - **6 sessions d'évaluation** : S1 à S6, réparties sur 3 ans de formation
 - **Graphiques radar** : Visualisation de la progression d'un élève avec superposition des sessions
-- **Architecture GDPR-ready** : Isolation des données par enseignant, prêt pour l'authentification future
+- **Architecture GDPR-ready & Sécurisée** : Isolation stricte par enseignant via authentification et politiques RLS actives
 
 ## 📚 Compétences évaluées
 
@@ -72,7 +72,7 @@ src/
 ├── context/TeacherContext.jsx  # Contexte enseignant
 ├── utils/constants.js       # Constantes métier
 ├── pages/
-│   ├── TeacherSelect.jsx    # Écran 1 : Sélection profil
+│   ├── TeacherSelect.jsx    # Écran 1 : Connexion / Inscription
 │   ├── ClassManage.jsx      # Écran 2 : Gestion classes
 │   └── EvalGrid.jsx         # Écran 3 : Grille d'évaluation
 └── components/
@@ -88,7 +88,7 @@ src/
 Le modèle de données est conçu pour être "Privacy by Design" :
 
 - **Isolation** : Toutes les requêtes filtrent par `teacher_id`
-- **RLS** : Policies Supabase préparées (commentées dans schema.sql)
+- **RLS** : Policies Supabase actives par défaut sur toutes les tables (chaque utilisateur accède uniquement à ses données)
 - **Chiffrement** : Colonnes `encrypted_*` prêtes pour la v2
 - **Cascade** : `ON DELETE CASCADE` sur toutes les FK (droit à l'oubli)
 

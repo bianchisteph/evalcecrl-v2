@@ -5,78 +5,73 @@ import { supabase } from '../lib/supabase';
 import { useTeacher } from '../context/TeacherContext';
 
 export default function TeacherSelect() {
-  const { selectTeacher, teacher } = useTeacher();
+  const { teacher } = useTeacher();
   const navigate = useNavigate();
 
-  const [teachers, setTeachers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Rediriger si déjà connecté
+  // Rediriger vers l'espace de gestion des classes si déjà connecté
   useEffect(() => {
     if (teacher) {
       navigate('/classes');
     }
   }, [teacher, navigate]);
 
-  useEffect(() => {
-    loadTeachers();
-  }, []);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      toast.error('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
 
-  const loadTeachers = async () => {
+    setLoading(true);
+
     try {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('id, name, email')
-        .order('name');
+      if (isLogin) {
+        // Flux Connexion
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        toast.success('Connexion réussie !');
+      } else {
+        // Flux Inscription
+        if (!name.trim()) {
+          toast.error('Le nom complet est obligatoire pour l\'inscription.');
+          setLoading(false);
+          return;
+        }
 
-      if (error) throw error;
-      setTeachers(data || []);
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+          options: {
+            data: {
+              name: name.trim(),
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        // Si la confirmation par email est activée sur Supabase, informer l'utilisateur
+        if (data?.user && data.session === null) {
+          toast.success('Compte créé ! Veuillez vérifier votre boîte mail pour confirmer votre inscription.');
+          setIsLogin(true);
+        } else {
+          toast.success('Compte créé et connecté avec succès !');
+        }
+      }
     } catch (err) {
-      toast.error('Erreur de connexion à la base de données');
+      toast.error(err.message || 'Une erreur est survenue.');
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSelect = (t) => {
-    selectTeacher(t);
-    toast.success(`Bienvenue, ${t.name} !`);
-    navigate('/classes');
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    setCreating(true);
-    try {
-      const { data, error } = await supabase
-        .from('teachers')
-        .insert({
-          name: newName.trim(),
-          email: newEmail.trim() || null,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      selectTeacher(data);
-      toast.success(`Profil créé ! Bienvenue, ${data.name}`);
-      navigate('/classes');
-    } catch (err) {
-      if (err.message?.includes('duplicate')) {
-        toast.error('Cet email est déjà utilisé');
-      } else {
-        toast.error('Erreur : ' + err.message);
-      }
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -92,7 +87,7 @@ export default function TeacherSelect() {
         padding: 'var(--space-md)',
       }}
     >
-      <div className="animate-slide-up" style={{ width: '100%', maxWidth: 480 }}>
+      <div className="animate-slide-up" style={{ width: '100%', maxWidth: 450 }}>
         {/* Logo & Titre */}
         <div className="text-center mb-lg">
           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-md)' }}>📊</div>
@@ -102,120 +97,93 @@ export default function TeacherSelect() {
           </p>
         </div>
 
-        {/* Carte de sélection */}
+        {/* Carte d'authentification */}
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">
-              {showCreate ? 'Créer un profil' : 'Sélectionner un profil'}
-            </h2>
+          {/* Onglets Connexion / Inscription */}
+          <div className="flex gap-sm mb-lg" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-sm)' }}>
+            <button
+              type="button"
+              className={`btn ${isLogin ? 'btn-primary' : 'btn-ghost'} w-full`}
+              onClick={() => {
+                setIsLogin(true);
+                setPassword('');
+              }}
+              style={{ borderRadius: 'var(--radius-md)' }}
+            >
+              Connexion
+            </button>
+            <button
+              type="button"
+              className={`btn ${!isLogin ? 'btn-primary' : 'btn-ghost'} w-full`}
+              onClick={() => {
+                setIsLogin(false);
+                setPassword('');
+              }}
+              style={{ borderRadius: 'var(--radius-md)' }}
+            >
+              Créer un compte
+            </button>
           </div>
 
-          {loading ? (
-            <div className="text-center text-muted" style={{ padding: '40px 0' }}>
-              Connexion à la base de données...
-            </div>
-          ) : showCreate ? (
-            /* Formulaire de création */
-            <form onSubmit={handleCreate}>
-              <div className="form-group">
-                <label htmlFor="teacher-name">Nom complet *</label>
+          <form onSubmit={handleSubmit}>
+            {!isLogin && (
+              <div className="form-group animate-slide-in">
+                <label htmlFor="reg-name">Nom complet *</label>
                 <input
-                  id="teacher-name"
+                  id="reg-name"
                   type="text"
                   className="input"
-                  placeholder="Ex: Marie Dupont"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  autoFocus
-                  required
+                  placeholder="Marie Dupont"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={!isLogin}
+                  autoComplete="name"
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="teacher-email">Email (optionnel)</label>
-                <input
-                  id="teacher-email"
-                  type="email"
-                  className="input"
-                  placeholder="Ex: m.dupont@lycee.fr"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-sm">
-                <button
-                  type="button"
-                  className="btn btn-secondary w-full"
-                  onClick={() => setShowCreate(false)}
-                >
-                  ← Retour
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary w-full"
-                  disabled={creating || !newName.trim()}
-                >
-                  {creating ? 'Création...' : 'Créer le profil'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* Liste des enseignants */
-            <div>
-              {teachers.length > 0 ? (
-                <ul className="sidebar-list" style={{ marginBottom: 'var(--space-md)' }}>
-                  {teachers.map((t) => (
-                    <li
-                      key={t.id}
-                      className="sidebar-item"
-                      onClick={() => handleSelect(t)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSelect(t)}
-                    >
-                      <div className="flex items-center gap-sm">
-                        <div className="navbar-avatar">
-                          {t.name
-                            .split(' ')
-                            .map((w) => w[0])
-                            .join('')
-                            .toUpperCase()
-                            .slice(0, 2)}
-                        </div>
-                        <div>
-                          <div className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {t.name}
-                          </div>
-                          {t.email && (
-                            <div className="text-sm text-muted">{t.email}</div>
-                          )}
-                        </div>
-                      </div>
-                      <span style={{ color: 'var(--text-muted)' }}>→</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="empty-state" style={{ padding: 'var(--space-lg) 0' }}>
-                  <div className="empty-state-icon">👋</div>
-                  <div className="empty-state-title">Aucun profil trouvé</div>
-                  <div className="empty-state-text">
-                    Créez votre premier profil enseignant pour commencer.
-                  </div>
-                </div>
-              )}
-              <button
-                className="btn btn-primary w-full"
-                onClick={() => setShowCreate(true)}
-              >
-                + Créer un nouveau profil
-              </button>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="auth-email">Email *</label>
+              <input
+                id="auth-email"
+                type="email"
+                className="input"
+                placeholder="m.dupont@lycee.fr"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
-          )}
+
+            <div className="form-group">
+              <label htmlFor="auth-password">Mot de passe *</label>
+              <input
+                id="auth-password"
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary w-full mt-md"
+              disabled={loading}
+              style={{ padding: 'var(--space-md)' }}
+            >
+              {loading ? 'Traitement en cours...' : isLogin ? 'Se connecter' : 'Créer mon compte'}
+            </button>
+          </form>
         </div>
 
         {/* Footer */}
         <div className="text-center text-muted text-sm mt-lg">
-          Données sécurisées · Architecture GDPR-ready
+          Données sécurisées par Row-Level Security · Architecture GDPR-ready
         </div>
       </div>
     </div>

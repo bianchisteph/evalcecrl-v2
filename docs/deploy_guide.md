@@ -110,12 +110,15 @@ Suivez les instructions et ajoutez les variables d'environnement quand demandé.
 
 ---
 
-## Étape 6 — Configurer les accès Supabase (optionnel mais recommandé)
+## Étape 6 — Configurer Supabase Auth
 
-Par défaut, Supabase permet l'accès public via la clé `anon`. Pour le MVP, c'est suffisant. Mais pour plus de sécurité :
+Pour que l'authentification par Email/Mot de passe fonctionne correctement :
 
-1. Allez dans **Settings** > **API** > **API Settings**
-2. Ajoutez l'URL de votre site Vercel dans **Additional Redirect URLs**
+1. Dans votre projet Supabase, allez dans **Authentication** > **Providers** > **Email**.
+2. Par défaut, Supabase exige une confirmation par email avant de permettre la connexion.
+   - Si vous souhaitez tester immédiatement sans validation par email, décochez **"Confirm email"** et sauvegardez.
+3. Allez dans **Authentication** > **URL Configuration**.
+4. Ajoutez l'URL de votre application Vercel dans **Redirect URLs** (ex: `https://mon-app.vercel.app`) pour que les liens de confirmation redirigent vers votre site.
 
 ---
 
@@ -136,17 +139,14 @@ Par défaut, Supabase permet l'accès public via la clé `anon`. Pour le MVP, c'
 → Vérifiez que vos variables `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont correctes dans `.env` (local) ou dans les settings Vercel (production).
 
 ### "Permission denied" sur les tables
-→ Assurez-vous que les RLS (Row Level Security) sont **désactivées** pour le MVP. Dans Supabase > Authentication > Policies, les tables ne doivent pas avoir de policies actives.
+→ Assurez-vous d'être bien connecté avec un compte enseignant valide. Si le problème persiste, vérifiez dans votre console Supabase (**Database** > **Policies**) que le RLS est bien activé et que les politiques de sécurité de `schema.sql` sont bien appliquées sur chaque table.
 
 ### Le build échoue sur Vercel
 → Vérifiez que le framework est bien détecté comme "Vite" et que les variables d'environnement commencent par `VITE_`.
 
 ---
 
-## Évolution future (v2)
+## Évolutions futures (v3)
 
-Pour passer à une version authentifiée :
-1. Activer Supabase Auth
-2. Décommenter les RLS policies dans `schema.sql` et les exécuter
-3. Remplacer l'écran de sélection par un écran de login
-4. Le reste du code reste inchangé grâce à l'architecture `teacher_id`
+- **Chiffrement des données nominatives** : Utiliser les colonnes `encrypted_first_name` et `encrypted_last_name` (déjà présentes) avec du chiffrement côté client (Zero-Knowledge) ou pg-sodium pour garantir une confidentialité totale des élèves (Conformité RGPD absolue).
+- **Export PDF / Impression** : Permettre d'exporter les grilles d'évaluation et graphiques radars pour les dossiers scolaires ou conseils de classe.
